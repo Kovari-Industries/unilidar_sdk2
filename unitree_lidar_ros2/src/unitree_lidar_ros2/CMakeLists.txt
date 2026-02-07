@@ -22,6 +22,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(PCL REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2_sensor_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 
 include_directories(
@@ -47,20 +48,35 @@ target_link_libraries( unitree_lidar_ros2_node
 
 ament_target_dependencies(
   unitree_lidar_ros2_node
-  rclcpp std_msgs 
+  rclcpp std_msgs
   sensor_msgs
-  geometry_msgs 
+  geometry_msgs
   tf2_ros
   pcl_conversions
 )
 
+add_executable(pointcloud_cropbox_filter src/pointcloud_cropbox_filter_node.cpp)
+
+target_link_libraries(pointcloud_cropbox_filter
+  ${PCL_LIBRARIES}
+)
+
+ament_target_dependencies(pointcloud_cropbox_filter
+  rclcpp
+  sensor_msgs
+  pcl_conversions
+  tf2_ros
+  tf2_sensor_msgs
+)
+
 install(TARGETS
 unitree_lidar_ros2_node
+pointcloud_cropbox_filter
   DESTINATION lib/${PROJECT_NAME}
 )
 
 # install rviz file and launch file
-install(FILES rviz/view.rviz launch/launch.py launch/lidar_with_tf.launch.py launch/lidar_only.launch.py
+install(FILES rviz/view.rviz launch/launch.py launch/lidar_with_tf.launch.py launch/lidar_only.launch.py launch/lidar_with_cropbox.launch.py
   DESTINATION share/${PROJECT_NAME}
 )
 
