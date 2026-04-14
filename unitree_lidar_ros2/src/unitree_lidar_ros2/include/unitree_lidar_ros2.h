@@ -201,6 +201,16 @@ void UnitreeLidarSDKNode::timer_callback()
     }
     else if (result == LIDAR_2D_POINT_DATA_PACKET_TYPE)
     {
+        // Only handle 2D packets when in 2D measurement mode (work_mode bit 1 = 1).
+        // In 3D mode (workmode 0), the firmware may still emit type-103 packets, but
+        // parseFromPacketPointCloud2D sets x=0 for every point (no horizontal rotation),
+        // producing flat planes that corrupt the 3D cloud topic. The 3D cloud is built
+        // exclusively from LIDAR_POINT_DATA_PACKET_TYPE packets via getPointCloud() above.
+        if (!(work_mode_ & 0x02))
+        {
+            return;
+        }
+
         PointCloudUnitree cloud;
         parseFromPacketPointCloud2D(cloud, lsdk_->getLidar2DPointDataPacket(),
                                     use_system_timestamp_, range_min_, range_max_);
