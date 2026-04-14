@@ -190,7 +190,7 @@ void UnitreeLidarSDKNode::timer_callback()
 
             sensor_msgs::msg::PointCloud2 cloud_msg;
             pcl::toROSMsg(*cloudOut, cloud_msg);
-            
+
             // This remains "unilidar_lidar" (or whatever cloud_frame_ is set to)
             // Your URDF will now provide the static transform for this frame.
             cloud_msg.header.frame_id = cloud_frame_;
@@ -198,5 +198,24 @@ void UnitreeLidarSDKNode::timer_callback()
 
             pub_cloud_->publish(cloud_msg);
         }
+    }
+    else if (result == LIDAR_2D_POINT_DATA_PACKET_TYPE)
+    {
+        PointCloudUnitree cloud;
+        parseFromPacketPointCloud2D(cloud, lsdk_->getLidar2DPointDataPacket(),
+                                    use_system_timestamp_, range_min_, range_max_);
+
+        transformUnitreeCloudToPCL(cloud, cloudOut);
+
+        rclcpp::Time timestamp(
+            static_cast<int32_t>(cloud.stamp),
+            static_cast<uint32_t>((cloud.stamp - static_cast<int32_t>(cloud.stamp)) * 1e9));
+
+        sensor_msgs::msg::PointCloud2 cloud_msg;
+        pcl::toROSMsg(*cloudOut, cloud_msg);
+        cloud_msg.header.frame_id = cloud_frame_;
+        cloud_msg.header.stamp = timestamp;
+
+        pub_cloud_->publish(cloud_msg);
     }
 }
