@@ -165,12 +165,24 @@ void UnitreeLidarSDKNode::timer_callback()
         LidarImuData imu;
         if (lsdk_->getImuData(imu))
         {
-            // Optional: You can still publish the IMU topic data if needed
             rclcpp::Time timestamp(imu.info.stamp.sec, imu.info.stamp.nsec);
             sensor_msgs::msg::Imu imuMsg;
             imuMsg.header.frame_id = imu_frame_;
             imuMsg.header.stamp = timestamp;
-            // ... (fill in orientation/velocity/acceleration as before)
+            // SDK ordering is w,x,y,z; ROS stores x,y,z,w. Rates and
+            // acceleration use the SDK's SI units, as in the upstream ROS driver.
+            imuMsg.orientation.w = imu.quaternion[0];
+            imuMsg.orientation.x = imu.quaternion[1];
+            imuMsg.orientation.y = imu.quaternion[2];
+            imuMsg.orientation.z = imu.quaternion[3];
+            imuMsg.angular_velocity.x = imu.angular_velocity[0];
+            imuMsg.angular_velocity.y = imu.angular_velocity[1];
+            imuMsg.angular_velocity.z = imu.angular_velocity[2];
+            imuMsg.linear_acceleration.x = imu.linear_acceleration[0];
+            imuMsg.linear_acceleration.y = imu.linear_acceleration[1];
+            imuMsg.linear_acceleration.z = imu.linear_acceleration[2];
+            // Zero covariance means unknown, not perfect confidence. Do not
+            // publish an IMU TF that conflicts with the robot's fixed mount.
             pub_imu_->publish(imuMsg);
 
             // REMOVED: All broadcaster_->sendTransform calls are gone from here.
