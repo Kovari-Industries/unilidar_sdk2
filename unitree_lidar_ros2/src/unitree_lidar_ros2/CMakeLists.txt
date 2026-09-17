@@ -80,4 +80,11 @@ install(FILES rviz/view.rviz launch/launch.py launch/lidar_with_tf.launch.py lau
   DESTINATION share/${PROJECT_NAME}
 )
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_crop_cloud test/test_crop_cloud.cpp)
+  ament_target_dependencies(test_crop_cloud sensor_msgs pcl_conversions tf2_sensor_msgs)
+  target_link_libraries(test_crop_cloud ${PCL_LIBRARIES})
+endif()
+
 ament_package()
