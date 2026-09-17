@@ -10,7 +10,7 @@
  */
 
 #include <pcl/filters/crop_box.h>
-#include <pcl/point_types.h>
+#include "crop_cloud.hpp"
 #include <pcl_conversions/pcl_conversions.h>
 
 #include "rclcpp/rclcpp.hpp"
@@ -114,21 +114,11 @@ private:
       cloud_in = *msg;
     }
 
-    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>);
-    pcl::fromROSMsg(cloud_in, *cloud);
-
-    pcl::CropBox<pcl::PointXYZI> crop;
-    crop.setInputCloud(cloud);
-    crop.setMin(Eigen::Vector4f(crop_min_x_, crop_min_y_, crop_min_z_, 1.0f));
-    crop.setMax(Eigen::Vector4f(crop_max_x_, crop_max_y_, crop_max_z_, 1.0f));
-    crop.setNegative(negative_);
-
-    pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>);
-    crop.filter(*filtered);
-
-    sensor_msgs::msg::PointCloud2 output;
-    pcl::toROSMsg(*filtered, output);
-    output.header = cloud_in.header;
+    // Filter the serialized point records so ring/time and future SDK fields survive.
+    const auto output = crop_cloud_preserving_fields(
+      cloud_in,
+      Eigen::Vector4f(crop_min_x_, crop_min_y_, crop_min_z_, 1.0f),
+      Eigen::Vector4f(crop_max_x_, crop_max_y_, crop_max_z_, 1.0f), negative_);
 
     pub_->publish(output);
   }
