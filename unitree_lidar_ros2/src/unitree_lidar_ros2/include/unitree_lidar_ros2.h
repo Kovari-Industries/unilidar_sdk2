@@ -165,7 +165,14 @@ void UnitreeLidarSDKNode::timer_callback()
         LidarImuData imu;
         if (lsdk_->getImuData(imu))
         {
+            // Same clock as the cloud: host receipt time, or the lidar's own clock.
             rclcpp::Time timestamp(imu.info.stamp.sec, imu.info.stamp.nsec);
+            if (use_system_timestamp_)
+            {
+                TimeStamp now;
+                getSystemTimeStamp(now);
+                timestamp = rclcpp::Time(now.sec, now.nsec);
+            }
             sensor_msgs::msg::Imu imuMsg;
             imuMsg.header.frame_id = imu_frame_;
             imuMsg.header.stamp = timestamp;
