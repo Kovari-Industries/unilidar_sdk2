@@ -277,6 +277,14 @@ void UnitreeLidarSDKNode::timer_callback()
             if (hardware_clock_map_)
                 clock_map_.observe(imu_hw, arrival);
             rclcpp::Time timestamp = host_stamp(imu_hw);
+            // Without the clock map, use_system_timestamp puts the IMU on the
+            // cloud's clock: host receipt time.
+            if (!hardware_clock_map_ && use_system_timestamp_)
+            {
+                TimeStamp now;
+                getSystemTimeStamp(now);
+                timestamp = rclcpp::Time(now.sec, now.nsec);
+            }
             sensor_msgs::msg::Imu imuMsg;
             imuMsg.header.frame_id = imu_frame_;
             imuMsg.header.stamp = timestamp;
