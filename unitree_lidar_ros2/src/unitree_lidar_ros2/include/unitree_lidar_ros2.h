@@ -242,9 +242,9 @@ static rclcpp::Time seconds_to_ros_time(double t)
 }
 
 // runParse() handles one packet per call. Point and IMU packets together arrive
-// faster than one per 1 ms tick whenever a tick runs late, and the backlog then
-// overflowed: about two IMU samples a second never reached the topic. Drain
-// every waiting packet, bounded so one tick cannot starve the executor.
+// faster than one per 1 ms tick whenever a tick runs late, leaving a backlog in
+// the socket that waits for later ticks. Drain every waiting packet, bounded so
+// one tick cannot starve the executor.
 void UnitreeLidarSDKNode::timer_callback()
 {
     for (int i = 0; i < 64; ++i)
