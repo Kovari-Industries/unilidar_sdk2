@@ -112,6 +112,7 @@ public:
     ~UnitreeLidarSDKNode() {};
 
     void timer_callback();
+    void handlePacket(int result);
 
 protected:
     // ROS
@@ -240,9 +241,23 @@ static rclcpp::Time seconds_to_ros_time(double t)
     return rclcpp::Time(sec, static_cast<uint32_t>(nsec), RCL_ROS_TIME);
 }
 
+// runParse() handles one packet per call. Point and IMU packets together arrive
+// faster than one per 1 ms tick whenever a tick runs late, leaving a backlog in
+// the socket that waits for later ticks. Drain every waiting packet, bounded so
+// one tick cannot starve the executor.
 void UnitreeLidarSDKNode::timer_callback()
 {
-    int result = lsdk_->runParse();
+    for (int i = 0; i < 64; ++i)
+    {
+        const int result = lsdk_->runParse();
+        if (result == 0)
+            return;
+        handlePacket(result);
+    }
+}
+
+void UnitreeLidarSDKNode::handlePacket(int result)
+{
     static pcl::PointCloud<PointType>::Ptr cloudOut(new pcl::PointCloud<PointType>());
     const rclcpp::Time arrival_time = this->now();
     const double arrival = arrival_time.seconds();
