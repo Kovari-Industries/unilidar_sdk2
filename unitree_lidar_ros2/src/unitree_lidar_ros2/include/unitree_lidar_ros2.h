@@ -113,6 +113,7 @@ public:
 
     void timer_callback();
     void handlePacket(int result);
+    void startRotation();
 
 protected:
     // ROS
@@ -139,6 +140,10 @@ protected:
     bool hardware_clock_map_;
     LidarClockMap clock_map_;
     rclcpp::Time last_clock_log_{0, 0, RCL_ROS_TIME};
+    // Point packets prove the rotor is spinning; without them, ask again.
+    rclcpp::Time last_point_packet_{0, 0, RCL_ROS_TIME};
+    rclcpp::Time last_start_request_{0, 0, RCL_ROS_TIME};
+    static constexpr double kStartRetrySec = 2.0;
     double range_min_;
     double range_max_;
 
@@ -225,6 +230,9 @@ UnitreeLidarSDKNode::UnitreeLidarSDKNode(const rclcpp::NodeOptions &options)
     }
 
     lsdk_->setLidarWorkMode(work_mode_);
+    // With work_mode bit 4 set the lidar powers on without spinning and waits
+    // for this command, so it only rotates while the driver runs.
+    startRotation();
 
     // ROS2
     broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(*this);
@@ -251,9 +259,27 @@ void UnitreeLidarSDKNode::timer_callback()
     {
         const int result = lsdk_->runParse();
         if (result == 0)
-            return;
+            break;
+        if (result == (work_mode_ & 0x02 ? LIDAR_2D_POINT_DATA_PACKET_TYPE : LIDAR_POINT_DATA_PACKET_TYPE))
+            last_point_packet_ = this->now();
         handlePacket(result);
     }
+
+    // A lost start command, or a lidar that rebooted into standby, leaves the
+    // rotor stopped. Resend the start until point packets arrive.
+    const rclcpp::Time now = this->now();
+    if ((now - last_point_packet_).seconds() > kStartRetrySec &&
+        (now - last_start_request_).seconds() > kStartRetrySec)
+    {
+        RCLCPP_WARN(get_logger(), "no lidar point packets for %.0f s, sending start rotation", kStartRetrySec);
+        startRotation();
+    }
+}
+
+void UnitreeLidarSDKNode::startRotation()
+{
+    last_start_request_ = this->now();
+    lsdk_->startLidarRotation();
 }
 
 void UnitreeLidarSDKNode::handlePacket(int result)
