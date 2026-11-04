@@ -140,10 +140,13 @@ protected:
     bool hardware_clock_map_;
     LidarClockMap clock_map_;
     rclcpp::Time last_clock_log_{0, 0, RCL_ROS_TIME};
-    // Point packets prove the rotor is spinning; without them, ask again.
+    // A lidar in standby sends nothing; once started it streams IMU at once,
+    // but point packets only after the rotor spins up (30-50 s on an L2).
+    rclcpp::Time last_packet_{0, 0, RCL_ROS_TIME};
     rclcpp::Time last_point_packet_{0, 0, RCL_ROS_TIME};
     rclcpp::Time last_start_request_{0, 0, RCL_ROS_TIME};
-    static constexpr double kStartRetrySec = 2.0;
+    static constexpr double kNoPacketRetrySec = 2.0;
+    static constexpr double kSpinUpRetrySec = 90.0;
     double range_min_;
     double range_max_;
 
@@ -260,18 +263,25 @@ void UnitreeLidarSDKNode::timer_callback()
         const int result = lsdk_->runParse();
         if (result == 0)
             break;
+        last_packet_ = this->now();
         if (result == (work_mode_ & 0x02 ? LIDAR_2D_POINT_DATA_PACKET_TYPE : LIDAR_POINT_DATA_PACKET_TYPE))
-            last_point_packet_ = this->now();
+            last_point_packet_ = last_packet_;
         handlePacket(result);
     }
 
     // A lost start command, or a lidar that rebooted into standby, leaves the
-    // rotor stopped. Resend the start until point packets arrive.
+    // rotor stopped. Resend the start quickly while the lidar is silent, and
+    // only after a full spin-up time while it streams IMU without points.
     const rclcpp::Time now = this->now();
-    if ((now - last_point_packet_).seconds() > kStartRetrySec &&
-        (now - last_start_request_).seconds() > kStartRetrySec)
+    const double since_start = (now - last_start_request_).seconds();
+    if ((now - last_packet_).seconds() > kNoPacketRetrySec && since_start > kNoPacketRetrySec)
     {
-        RCLCPP_WARN(get_logger(), "no lidar point packets for %.0f s, sending start rotation", kStartRetrySec);
+        RCLCPP_WARN(get_logger(), "no lidar packets for %.0f s, sending start rotation", kNoPacketRetrySec);
+        startRotation();
+    }
+    else if ((now - last_point_packet_).seconds() > kSpinUpRetrySec && since_start > kSpinUpRetrySec)
+    {
+        RCLCPP_WARN(get_logger(), "no lidar point packets for %.0f s, sending start rotation", kSpinUpRetrySec);
         startRotation();
     }
 }
