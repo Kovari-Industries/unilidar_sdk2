@@ -109,7 +109,10 @@ class UnitreeLidarSDKNode : public rclcpp::Node
 public:
     explicit UnitreeLidarSDKNode(const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
 
-    ~UnitreeLidarSDKNode() {};
+    // Stop the rotor on a clean exit (evo down, Ctrl-C on evo up): the lidar
+    // then spins only while its driver runs. A crash or SIGKILL leaves it
+    // spinning until the restarted driver or the next power cycle.
+    ~UnitreeLidarSDKNode() { lsdk_->stopLidarRotation(); }
 
     void timer_callback();
     void handlePacket(int result);
